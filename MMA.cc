@@ -13,6 +13,7 @@ DLLEXPORT int WolframLibrary_initialize(WolframLibraryData libData){
 
 extern "C"{
   void sd_A(mreal* d, mint* nd, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* result);
+  void sd_omega_tilde(mreal* delta, mreal* omega, mreal* tp, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* result);
   void sd_rhoSf(mreal* d, mint* nd, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* vkAngles, mreal* vk, mint* nVk, mreal* result);
 }
 
@@ -58,3 +59,22 @@ EXTERN_C DLLEXPORT int A(WolframLibraryData libData, mint Argc, MArgument *Args,
   return LIBRARY_NO_ERROR;
 }
 
+EXTERN_C DLLEXPORT int omega_tilde(WolframLibraryData libData, mint Argc, MArgument *Args, MArgument Res){
+  mreal phi0, phi1, delta, omega, tp, result;
+  MTensor jac, jacAngles, gap, gapAngles;
+
+  delta = MArgument_getReal(Args[0]);
+  omega = MArgument_getReal(Args[1]);
+  tp = MArgument_getReal(Args[2]);
+  phi0 = MArgument_getReal(Args[3]);
+  phi1 = MArgument_getReal(Args[4]);
+  jacAngles = MArgument_getMTensor(Args[5]);
+  jac = MArgument_getMTensor(Args[6]);
+  gapAngles = MArgument_getMTensor(Args[7]);
+  gap = MArgument_getMTensor(Args[8]);
+
+  sd_omega_tilde(&delta, &omega, &tp, &phi0, &phi1, MTensor_getRealDataMacro(jacAngles), MTensor_getRealDataMacro(jac), MTensor_getDimensionsMacro(jac), MTensor_getRealDataMacro(gapAngles), MTensor_getRealDataMacro(gap), MTensor_getDimensionsMacro(gap), &result);
+
+  MArgument_setReal(Res, result);
+  return LIBRARY_NO_ERROR;
+}
