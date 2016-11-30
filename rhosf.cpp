@@ -1,3 +1,5 @@
+#define _USE_MATH_DEFINES
+ 
 #include <stdio.h>
 #include <cmath>  
 #include <gsl/gsl_integration.h>
@@ -13,6 +15,7 @@
 struct gap_params{
   int n; // Dimensionless Matsubara index (n+0.5)
   double d; // Dimensionless gap ($\delta$)
+  double T; // Temperature
   gsl_spline* jacSpline; // Spline interpolation of the jacobian
   gsl_interp_accel* jacSplineAcc;
   gsl_spline* gapSpline; // Spline interpolation of the gap
@@ -43,14 +46,15 @@ double AIntegrand(double phi, void* p){
 
 double rhoSfIntegrand(double phi, void* p){
   struct gap_params *params = (struct gap_params*)p;
-  double jac, gap, vk, d;
+  double jac, gap, vk, d, T;
   int n = params->n;
   d = params->d;
+  T = params->T;
   jac = gsl_spline_eval(params->jacSpline, phi, params->jacSplineAcc);
   gap = gsl_spline_eval(params->gapSpline, phi, params->gapSplineAcc);
   vk = gsl_spline_eval(params->vkSpline, phi, params->vkSplineAcc);
 
-  return jac*vk*vk*d*d*gap*gap/pow(d*d*gap*gap + (n+0.5)*(n+0.5), 1.5);
+  return 2*M_PI*T*jac*vk*vk*d*d*gap*gap/pow(d*d*gap*gap + 4.0*M_PI*M_PI*T*T*(n+0.5)*(n+0.5), 1.5);
 }
 
 double rhoSfNormIntegrand(double phi, void* p){
@@ -150,7 +154,7 @@ extern "C" void sd_omega_tilde(double* delta, double* omega, double* tp, double*
   closeLog();
 }
 
-extern "C" void sd_rhoSf(double* d, int *nd, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* vkAngles, double* vk, int* nVk, double* result){
+extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* vkAngles, double* vk, int* nVk, double* result){
   double norm, error, res, gapRes, newRes;
   // Setup logging
   openLog("librhosf.log");
@@ -201,6 +205,7 @@ extern "C" void sd_rhoSf(double* d, int *nd, double* phi0, double* phi1, double*
       debug_print("%s| Calculating Matsubara frequency (n=%d+0.5)\n", getTime(), n);
       params.n = n;
       params.d = d[j];
+      params.T = T[j];
       gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &res, &error);
       newRes = gapRes + res/norm;
       if(fabs(newRes - gapRes) < TOL)

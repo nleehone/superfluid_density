@@ -14,26 +14,43 @@ DLLEXPORT int WolframLibrary_initialize(WolframLibraryData libData){
 extern "C"{
   void sd_A(mreal* d, mint* nd, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* result);
   void sd_omega_tilde(mreal* delta, mreal* omega, mreal* tp, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* result);
-  void sd_rhoSf(mreal* d, mint* nd, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* vkAngles, mreal* vk, mint* nVk, mreal* result);
+  void sd_rhoSf(mreal* d, mreal* T, mint* nd, mreal* phi0, mreal* phi1, mreal* jacAngles, mreal* jac, mint* nJac, mreal* gapAngles, mreal* gap, mint* nGap, mreal* vkAngles, mreal* vk, mint* nVk, mreal* result);
 }
 
 EXTERN_C DLLEXPORT int rho_sf(WolframLibraryData libData, mint Argc, MArgument *Args, MArgument Res){
   mreal phi0, phi1;
-  MTensor jac, jacAngles, gap, gapAngles, deltas, vk, vkAngles, result;
+  MTensor jac, jacAngles, gap, gapAngles, deltas, vk, vkAngles, result, temperatures;
 
   deltas = MArgument_getMTensor(Args[0]);
-  phi0 = MArgument_getReal(Args[1]);
-  phi1 = MArgument_getReal(Args[2]);
-  jacAngles = MArgument_getMTensor(Args[3]);
-  jac = MArgument_getMTensor(Args[4]);
-  gapAngles = MArgument_getMTensor(Args[5]);
-  gap = MArgument_getMTensor(Args[6]);
-  vkAngles = MArgument_getMTensor(Args[7]);
-  vk = MArgument_getMTensor(Args[8]);
+  temperatures = MArgument_getMTensor(Args[1]);
+  phi0 = MArgument_getReal(Args[2]);
+  phi1 = MArgument_getReal(Args[3]);
+  jacAngles = MArgument_getMTensor(Args[4]);
+  jac = MArgument_getMTensor(Args[5]);
+  gapAngles = MArgument_getMTensor(Args[6]);
+  gap = MArgument_getMTensor(Args[7]);
+  vkAngles = MArgument_getMTensor(Args[8]);
+  vk = MArgument_getMTensor(Args[9]);
 
   libData->MTensor_new(MType_Real, 1, MTensor_getDimensionsMacro(deltas), &result);
 
-  sd_rhoSf(MTensor_getRealDataMacro(deltas), MTensor_getDimensionsMacro(deltas), &phi0, &phi1, MTensor_getRealDataMacro(jacAngles), MTensor_getRealDataMacro(jac), MTensor_getDimensionsMacro(jac), MTensor_getRealDataMacro(gapAngles), MTensor_getRealDataMacro(gap), MTensor_getDimensionsMacro(gap), MTensor_getRealDataMacro(vkAngles), MTensor_getRealDataMacro(vk), MTensor_getDimensionsMacro(vk), MTensor_getRealDataMacro(result));
+  sd_rhoSf(
+      MTensor_getRealDataMacro(deltas), 
+      MTensor_getRealDataMacro(temperatures), 
+      MTensor_getDimensionsMacro(deltas), 
+      &phi0, 
+      &phi1, 
+      MTensor_getRealDataMacro(jacAngles), 
+      MTensor_getRealDataMacro(jac), 
+      MTensor_getDimensionsMacro(jac), 
+      MTensor_getRealDataMacro(gapAngles), 
+      MTensor_getRealDataMacro(gap), 
+      MTensor_getDimensionsMacro(gap), 
+      MTensor_getRealDataMacro(vkAngles), 
+      MTensor_getRealDataMacro(vk), 
+      MTensor_getDimensionsMacro(vk), 
+      MTensor_getRealDataMacro(result)
+      );
 
   MArgument_setMTensor(Res, result);
   return LIBRARY_NO_ERROR;
