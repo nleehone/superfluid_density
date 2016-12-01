@@ -232,12 +232,12 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* phi0, double* ph
   closeLog();
 }
 
-extern "C" void sd_A(double* d, int *nd, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* result){
+extern "C" void sd_A_clean(double* d, int *nd, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* result){
 
   double error, norm, res, gapRes, newRes;
   // Setup logging
   openLog("librhosf.log");
-  debug_print("%s| Begin: sd_A\n", getTime());
+  debug_print("%s| Begin: sd_A_clean\n", getTime());
   debug_print("%s| Settings: MAXIT: %d, TOL: %g, INTTOL: %g\n", getTime(), MAXIT, TOL, INTTOL);
   gsl_error_handler_t* old_handler = gsl_set_error_handler(&error_handler);
 
@@ -300,6 +300,78 @@ extern "C" void sd_A(double* d, int *nd, double* phi0, double* phi1, double* jac
   gsl_interp_accel_free(jacSplineAcc);
   gsl_interp_accel_free(gapSplineAcc);
   gsl_set_error_handler(old_handler);
-  debug_print("%s| End: sd_A\n", getTime());
+  debug_print("%s| End: sd_A_clean\n", getTime());
+  closeLog();
+}
+
+extern "C" void sd_A_born(double* d, int *nd, double* tp, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* result){
+
+  double error, norm, res, gapRes, newRes;
+  // Setup logging
+  openLog("librhosf.log");
+  debug_print("%s| Begin: sd_A_born\n", getTime());
+  debug_print("%s| Settings: MAXIT: %d, TOL: %g, INTTOL: %g\n", getTime(), MAXIT, TOL, INTTOL);
+  gsl_error_handler_t* old_handler = gsl_set_error_handler(&error_handler);
+
+  debug_print("%s| Setting up integration workspace\n", getTime());
+  gsl_integration_workspace *w = gsl_integration_workspace_alloc(1000);
+
+  debug_print("%s| Creating interpolation objects for jacobian and gap angular dependence\n", getTime());
+  const gsl_interp_type *type = gsl_interp_cspline;
+  gsl_interp_accel *jacSplineAcc = gsl_interp_accel_alloc();
+  gsl_interp_accel *gapSplineAcc = gsl_interp_accel_alloc();
+  gsl_spline *jacSpline = gsl_spline_alloc(type, *nJac);
+  gsl_spline *gapSpline = gsl_spline_alloc(type, *nGap);
+
+  debug_print("%s| Initializing jacobian interpolation\n", getTime());
+  gsl_spline_init(jacSpline, jacAngles, jac, *nJac);
+  debug_print("%s| Initializing gap interpolation\n", getTime());
+  gsl_spline_init(gapSpline, gapAngles, gap, *nGap);
+
+  struct gap_params params;
+  params.jacSpline = jacSpline;
+  params.jacSplineAcc = jacSplineAcc;
+  params.gapSpline = gapSpline;
+  params.gapSplineAcc = gapSplineAcc;
+
+  gsl_function F;
+  F.params = &params;
+
+  debug_print("%s| Integrating ANormIntegrand\n", getTime());
+  F.function = &ANormIntegrand;
+  gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &norm, &error);
+  
+  F.function = &AIntegrand;
+  int n;
+  for(int j = 0; j < *nd; j++){
+    debug_print("%s| Calculating A(d=%g)\n", getTime(), d[j]);
+    gapRes = 0.0;
+    for(n = 0; n < MAXIT; n++){
+      debug_print("%s| Calculating Matsubara frequency (n=%d+0.5)\n", getTime(), n);
+      params.n = n;
+      params.d = d[j];
+      gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &res, &error);
+      newRes = gapRes + 1.0/(n+0.5) - res/norm;
+      if(fabs(newRes - gapRes) < TOL){
+        break;
+      }
+      gapRes = newRes;
+    }
+    if(n < MAXIT)
+      debug_print("%s| A(d=%g) ended on step %d, with result: %g\n", getTime(), d[j], n, gapRes);
+    else
+      // Use fprint here so that the warning is always logged
+      fprintf(fpLog, "%s| WARNING: A(d=%g) ended on step %d=MAXIT, with result: %g. The result may not be valid to the prescribed tolerance: %g\n", getTime(), d[j], n, gapRes, TOL);
+    result[j] = gapRes;
+  }
+
+  debug_print("%s| Freeing memory for sd_A\n", getTime());
+  gsl_integration_workspace_free(w);
+  gsl_spline_free(jacSpline);
+  gsl_spline_free(gapSpline);
+  gsl_interp_accel_free(jacSplineAcc);
+  gsl_interp_accel_free(gapSplineAcc);
+  gsl_set_error_handler(old_handler);
+  debug_print("%s| End: sd_A_born\n", getTime());
   closeLog();
 }
