@@ -4,12 +4,12 @@
 #include <time.h>
 #include <stdio.h>
 
-#define DEBUG 0
+#define DEBUG 1
 
 // See http://stackoverflow.com/questions/1644868/c-define-macro-for-debug-printing for detailed reasons for
 // the form of this debug statement
 #define debug_print(fmt, ...) \
-              do { if (DEBUG) fprintf(fpLog, fmt, __VA_ARGS__); } while (0)
+              do { if (DEBUG) {fprintf(fpLog, fmt, __VA_ARGS__); fflush(fpLog);} } while (0)
 #define DTTMFMT "%Y-%m-%d %H:%M:%S "
 #define DTTMSZ 21
 
