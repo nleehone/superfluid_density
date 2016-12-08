@@ -93,6 +93,29 @@ double dosNormIntegrand(double phi, void* p){
   return jac;
 }
 
+double omega_tilde2(double omega, double Delta, double Gamma1, double Gamma2, double phi0, double phi1, struct gap_params* params, gsl_integration_workspace* w){
+  int n;
+  gsl_function F;
+  F.params = params;
+  double dos, error, norm;
+  F.function = &dosNormIntegrand;
+  gsl_integration_qag(&F, phi0, phi1, 0, INTTOL, 1000, 2, w, &norm, &error);
+  F.function = &dosIntegrand;
+  double omega_t = omega;
+  double omega_t_new;
+  for(n = 0; n < MAXIT; n++){
+    params->omega_t = omega_t;
+    params->Delta = Delta;
+    gsl_integration_qag(&F, phi0, phi1, 0, INTTOL, 1000, 2, w, &dos, &error);
+    dos /= norm;
+    omega_t_new = omega + M_PI*Gamma1*dos + M_PI*Gamma2/dos; 
+    if(fabs(omega_t_new - omega_t) < TOL)
+      break;
+    omega_t = omega_t_new;
+  }
+  return omega_t_new;
+}
+
 double omega_tilde(double omega, double Delta, double Gamma, double c, double phi0, double phi1, struct gap_params* params, gsl_integration_workspace* w){
   int n;
   gsl_function F;
@@ -241,6 +264,8 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* Gamma, double* c
       debug_print("%s| Error here?\n", getTime());
       if(*Gamma > 0)
         params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
+      if(*Gamma < 0)
+        params.omega_t = omega_tilde2(params.omega_t, d[j], -*Gamma, *c, *phi0, *phi1, &params, w);
       params.n = n;
       params.d = d[j];
       params.T = T[j];
