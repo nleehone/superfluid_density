@@ -4,7 +4,7 @@
 #include <time.h>
 #include <stdio.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 // See http://stackoverflow.com/questions/1644868/c-define-macro-for-debug-printing for detailed reasons for
 // the form of this debug statement
