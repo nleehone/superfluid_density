@@ -156,26 +156,20 @@ double omega_tilde(double omega, double Delta, double Gamma, double c, double ph
   return omega_t_new;
 }
 
-extern "C" void sd_omega_tilde(double* delta, double* omega, double* tp, double* phi0, double* phi1, double* jacAngles, double* jac, int* nJac, double* gapAngles, double* gap, int *nGap, double* result){
+/*extern "C" void sd_omega_tilde(double* delta, double* omega, double* tp, double* phi0, double* phi1, double* jacAngles, double* jac, int* nJac, double* gapAngles, double* gap, int *nGap, double* result){
   // Setup logging
   openLog("librhosf.log");
-  debug_print("%s| Begin: sd_omega_tilde\n", getTime());
-  debug_print("%s| Settings: INTTOL: %g\n", getTime(), INTTOL);
   gsl_error_handler_t* old_handler = gsl_set_error_handler(&error_handler);
 
-  debug_print("%s| Setting up integration workspace\n", getTime());
   gsl_integration_workspace *w = gsl_integration_workspace_alloc(1000);
 
-  debug_print("%s| Initializing jacobian interpolation\n", getTime());
   const gsl_interp_type *type = gsl_interp_cspline;
   gsl_interp_accel *jacSplineAcc = gsl_interp_accel_alloc();
   gsl_interp_accel *gapSplineAcc = gsl_interp_accel_alloc();
   gsl_spline *jacSpline = gsl_spline_alloc(type, *nJac);
   gsl_spline *gapSpline = gsl_spline_alloc(type, *nGap);
 
-  debug_print("%s| Initializing jacobian interpolation\n", getTime());
   gsl_spline_init(jacSpline, jacAngles, jac, *nJac);
-  debug_print("%s| Initializing gap interpolation\n", getTime());
   gsl_spline_init(gapSpline, gapAngles, gap, *nGap);
 
   struct dos_params params;
@@ -188,7 +182,6 @@ extern "C" void sd_omega_tilde(double* delta, double* omega, double* tp, double*
   F.params = &params;
 
   double dos, error, norm;
-  debug_print("%s| Integrating dosNormIntegrand\n", getTime());
   F.function = &dosNormIntegrand;
   gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &norm, &error);
   
@@ -213,28 +206,22 @@ extern "C" void sd_omega_tilde(double* delta, double* omega, double* tp, double*
 
   *result = omega_t_new;
 
-  debug_print("%s| Freeing memory for sd_omega_tilde\n", getTime());
   gsl_integration_workspace_free(w);
   gsl_spline_free(jacSpline);
   gsl_spline_free(gapSpline);
   gsl_interp_accel_free(jacSplineAcc);
   gsl_interp_accel_free(gapSplineAcc);
-  debug_print("%s| End: sd_omega_tilde\n", getTime());
   closeLog();
-}
+  }*/
 
 extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* gamma, double* c, double* phi0, double* phi1, double* angles, double* jac, double* gap, double* vk, int* nAngles, double* result){
   double norm, error, res, gapRes, newRes;
   // Setup logging
   openLog("librhosf.log");
-  debug_print("%s| Begin: sd_rhoSf\n", getTime());
-  debug_print("%s| Settings: MAXIT: %d, TOL: %g, INTTOL: %g\n", getTime(), MAXIT, TOL, INTTOL);
   gsl_error_handler_t* old_handler = gsl_set_error_handler(&error_handler);
 
-  debug_print("%s| Setting up integration workspace\n", getTime());
   gsl_integration_workspace *w = gsl_integration_workspace_alloc(1000);
 
-  debug_print("%s| Initializing jacobian interpolation\n", getTime());
   const gsl_interp_type *type = gsl_interp_cspline;
   gsl_interp_accel *jacSplineAcc = gsl_interp_accel_alloc();
   gsl_interp_accel *gapSplineAcc = gsl_interp_accel_alloc();
@@ -243,11 +230,8 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* gamma, double* c
   gsl_spline *gapSpline = gsl_spline_alloc(type, *nAngles);
   gsl_spline *vkSpline = gsl_spline_alloc(type, *nAngles);
 
-  debug_print("%s| Initializing jacobian interpolation\n", getTime());
   gsl_spline_init(jacSpline, angles, jac, *nAngles);
-  debug_print("%s| Initializing gap interpolation\n", getTime());
   gsl_spline_init(gapSpline, angles, gap, *nAngles);
-  debug_print("%s| Initializing vk interpolation\n", getTime());
   gsl_spline_init(vkSpline, angles, vk, *nAngles);
 
   struct gap_params params;
@@ -263,26 +247,20 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* gamma, double* c
   gsl_function F;
   F.params = &params;
 
-  debug_print("%s| Integrating rhoSfNormIntegrand\n", getTime());
   F.function = &rhoSfNormIntegrand;
   gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &norm, &error);
   
   F.function = &rhoSfIntegrand;
   int n;
   for(int j = 0; j < *nd; j++){
-    debug_print("%s| Calculating rho_sf(d=%g)\n", getTime(), d[j]);
     gapRes = 0.0;
     for(n = 0; n < MAXIT; n++){
-      debug_print("%s| Calculating Matsubara frequency (n=%d+0.5)\n", getTime(), n);
-      // pi*Gamma is P/(2) is Gamma_N
       params.Gamma = *gamma/(2.0*M_PI*T[j]);
       params.omega_t = (n+0.5);
       if(*gamma > 0)
         params.omega_t = omega_tilde(params.omega_t, d[j], *gamma/(2.0*M_PI*T[j]), *c, *phi0, *phi1, &params, w);
       else if(*gamma < 0)
         params.omega_t = omega_tilde2(params.omega_t, d[j], -*gamma/(2.0*M_PI*T[j]), *c, *phi0, *phi1, &params, w);
-      //params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
-      debug_print("%s| Error here?\n", getTime());
       params.n = n;
       params.d = d[j];
       params.T = T[j];
@@ -300,7 +278,6 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* gamma, double* c
     result[j] = gapRes;
   }
 
-  debug_print("%s| Freeing memory for sd_rhoSf\n", getTime());
   gsl_integration_workspace_free(w);
   gsl_spline_free(jacSpline);
   gsl_spline_free(gapSpline);
@@ -308,10 +285,10 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* gamma, double* c
   gsl_interp_accel_free(jacSplineAcc);
   gsl_interp_accel_free(gapSplineAcc);
   gsl_interp_accel_free(vkSplineAcc);
-  debug_print("%s| End: sd_rhoSf\n", getTime());
   closeLog();
 }
-extern "C" void sd_rhoSf_sc(double* d, double* T, int *nd, double* Gamma, double* c, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* vkAngles, double* vk, int* nVk, double* result){
+
+/*extern "C" void sd_rhoSf_sc(double* d, double* T, int *nd, double* Gamma, double* c, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* vkAngles, double* vk, int* nVk, double* result){
   double norm, error, res, gapRes, newRes;
   // Setup logging
   openLog("librhosf.log");
@@ -397,7 +374,7 @@ extern "C" void sd_rhoSf_sc(double* d, double* T, int *nd, double* Gamma, double
   closeLog();
 }
 
-/*extern "C" void sd_A_clean(double* d, int *nd, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* result){
+extern "C" void sd_A_clean(double* d, int *nd, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* result){
 
   double error, norm, res, gapRes, newRes;
   // Setup logging
@@ -474,23 +451,17 @@ extern "C" void sd_A(double* d, int *nd, double* Gamma, double* t, double* c, do
   double error, norm, res, gapRes, newRes;
   // Setup logging
   openLog("librhosf.log");
-  debug_print("%s| Begin: sd_A_nsc\n", getTime());
-  debug_print("%s| Settings: MAXIT: %d, TOL: %g, INTTOL: %g\n", getTime(), MAXIT, TOL, INTTOL);
   gsl_error_handler_t* old_handler = gsl_set_error_handler(&error_handler);
 
-  debug_print("%s| Setting up integration workspace\n", getTime());
   gsl_integration_workspace *w = gsl_integration_workspace_alloc(1000);
 
-  debug_print("%s| Creating interpolation objects for jacobian and gap angular dependence\n", getTime());
   const gsl_interp_type *type = gsl_interp_cspline;
   gsl_interp_accel *jacSplineAcc = gsl_interp_accel_alloc();
   gsl_interp_accel *gapSplineAcc = gsl_interp_accel_alloc();
   gsl_spline *jacSpline = gsl_spline_alloc(type, *nAngles);
   gsl_spline *gapSpline = gsl_spline_alloc(type, *nAngles);
 
-  debug_print("%s| Initializing jacobian interpolation\n", getTime());
   gsl_spline_init(jacSpline, angles, jac, *nAngles);
-  debug_print("%s| Initializing gap interpolation\n", getTime());
   gsl_spline_init(gapSpline, angles, gap, *nAngles);
 
   struct gap_params params;
@@ -504,17 +475,14 @@ extern "C" void sd_A(double* d, int *nd, double* Gamma, double* t, double* c, do
   gsl_function F;
   F.params = &params;
 
-  debug_print("%s| Integrating ANormIntegrand\n", getTime());
   F.function = &ANormIntegrand;
   gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &norm, &error);
   
   F.function = &AIntegrand;
   int n;
   for(int j = 0; j < *nd; j++){
-    debug_print("%s| Calculating A(d=%g)\n", getTime(), d[j]);
     gapRes = 0.0;
     for(n = 0; n < MAXIT; n++){
-      debug_print("%s| Calculating Matsubara frequency (n=%d+0.5)\n", getTime(), n);
       params.omega_t = (n+0.5);
       params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma/(2*M_PI*(*t)), *c, *phi0, *phi1, &params, w);
       params.n = n;
@@ -534,14 +502,12 @@ extern "C" void sd_A(double* d, int *nd, double* Gamma, double* t, double* c, do
     result[j] = gapRes;
   }
 
-  debug_print("%s| Freeing memory for sd_A_nsc\n", getTime());
   gsl_integration_workspace_free(w);
   gsl_spline_free(jacSpline);
   gsl_spline_free(gapSpline);
   gsl_interp_accel_free(jacSplineAcc);
   gsl_interp_accel_free(gapSplineAcc);
   gsl_set_error_handler(old_handler);
-  debug_print("%s| End: sd_A_nsc\n", getTime());
   closeLog();
 }
 
