@@ -73,7 +73,7 @@ double rhoSfIntegrand(double phi, void* p){
   gap = gsl_spline_eval(params->gapSpline, phi, params->gapSplineAcc);
   vk = gsl_spline_eval(params->vkSpline, phi, params->vkSplineAcc);
 
-  return 2*M_PI*T*jac*vk*vk*d*d*gap*gap/pow(d*d*gap*gap + omega_t*omega_t, 1.5);
+  return jac*vk*vk*d*d*gap*gap/pow(d*d*gap*gap + omega_t*omega_t, 1.5);
 }
 
 double rhoSfNormIntegrand(double phi, void* p){
@@ -223,7 +223,7 @@ extern "C" void sd_omega_tilde(double* delta, double* omega, double* tp, double*
   closeLog();
 }
 
-extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* Gamma, double* c, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* vkAngles, double* vk, int* nVk, double* result){
+extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* gamma, double* c, double* phi0, double* phi1, double* angles, double* jac, double* gap, double* vk, int* nAngles, double* result){
   double norm, error, res, gapRes, newRes;
   // Setup logging
   openLog("librhosf.log");
@@ -239,16 +239,16 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* Gamma, double* c
   gsl_interp_accel *jacSplineAcc = gsl_interp_accel_alloc();
   gsl_interp_accel *gapSplineAcc = gsl_interp_accel_alloc();
   gsl_interp_accel *vkSplineAcc = gsl_interp_accel_alloc();
-  gsl_spline *jacSpline = gsl_spline_alloc(type, *nJac);
-  gsl_spline *gapSpline = gsl_spline_alloc(type, *nGap);
-  gsl_spline *vkSpline = gsl_spline_alloc(type, *nVk);
+  gsl_spline *jacSpline = gsl_spline_alloc(type, *nAngles);
+  gsl_spline *gapSpline = gsl_spline_alloc(type, *nAngles);
+  gsl_spline *vkSpline = gsl_spline_alloc(type, *nAngles);
 
   debug_print("%s| Initializing jacobian interpolation\n", getTime());
-  gsl_spline_init(jacSpline, jacAngles, jac, *nJac);
+  gsl_spline_init(jacSpline, angles, jac, *nAngles);
   debug_print("%s| Initializing gap interpolation\n", getTime());
-  gsl_spline_init(gapSpline, gapAngles, gap, *nGap);
+  gsl_spline_init(gapSpline, angles, gap, *nAngles);
   debug_print("%s| Initializing vk interpolation\n", getTime());
-  gsl_spline_init(vkSpline, vkAngles, vk, *nVk);
+  gsl_spline_init(vkSpline, angles, vk, *nAngles);
 
   struct gap_params params;
   params.jacSpline = jacSpline;
@@ -258,7 +258,6 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* Gamma, double* c
   params.vkSpline = vkSpline;
   params.vkSplineAcc = vkSplineAcc;
   //params.P = *P;
-  params.Gamma = *Gamma;
   params.c = *c;
 
   gsl_function F;
@@ -275,12 +274,14 @@ extern "C" void sd_rhoSf(double* d, double* T, int *nd, double* Gamma, double* c
     gapRes = 0.0;
     for(n = 0; n < MAXIT; n++){
       debug_print("%s| Calculating Matsubara frequency (n=%d+0.5)\n", getTime(), n);
-      params.omega_t = 2*M_PI*T[j]*(n+0.5);
-      if(*Gamma > 0)
-        params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
-      if(*Gamma < 0)
-        params.omega_t = omega_tilde2(params.omega_t, d[j], -*Gamma, *c, *phi0, *phi1, &params, w);
-      params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
+      // pi*Gamma is P/(2) is Gamma_N
+      params.Gamma = *gamma/(2.0*M_PI*T[j]);
+      params.omega_t = (n+0.5);
+      if(*gamma > 0)
+        params.omega_t = omega_tilde(params.omega_t, d[j], *gamma/(2.0*M_PI*T[j]), *c, *phi0, *phi1, &params, w);
+      else if(*gamma < 0)
+        params.omega_t = omega_tilde2(params.omega_t, d[j], -*gamma/(2.0*M_PI*T[j]), *c, *phi0, *phi1, &params, w);
+      //params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
       debug_print("%s| Error here?\n", getTime());
       params.n = n;
       params.d = d[j];
@@ -365,7 +366,7 @@ extern "C" void sd_rhoSf_sc(double* d, double* T, int *nd, double* Gamma, double
       debug_print("%s| Error here?\n", getTime());
       if(*Gamma > 0)
         params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
-      if(*Gamma < 0)
+      else if(*Gamma < 0)
         params.omega_t = omega_tilde2(params.omega_t, d[j], -*Gamma, *c, *phi0, *phi1, &params, w);
       params.n = n;
       params.d = d[j];
@@ -468,7 +469,7 @@ extern "C" void sd_rhoSf_sc(double* d, double* T, int *nd, double* Gamma, double
   closeLog();
 }*/
 
-extern "C" void sd_A(double* d, int *nd, double* Gamma, double* c, double* phi0, double* phi1, double* jacAngles, double* jac, int *nJac, double* gapAngles, double* gap, int *nGap, double* result){
+extern "C" void sd_A(double* d, int *nd, double* Gamma, double* t, double* c, double* phi0, double* phi1, double* angles, double* jac, double* gap, int *nAngles, double* result){
 
   double error, norm, res, gapRes, newRes;
   // Setup logging
@@ -484,13 +485,13 @@ extern "C" void sd_A(double* d, int *nd, double* Gamma, double* c, double* phi0,
   const gsl_interp_type *type = gsl_interp_cspline;
   gsl_interp_accel *jacSplineAcc = gsl_interp_accel_alloc();
   gsl_interp_accel *gapSplineAcc = gsl_interp_accel_alloc();
-  gsl_spline *jacSpline = gsl_spline_alloc(type, *nJac);
-  gsl_spline *gapSpline = gsl_spline_alloc(type, *nGap);
+  gsl_spline *jacSpline = gsl_spline_alloc(type, *nAngles);
+  gsl_spline *gapSpline = gsl_spline_alloc(type, *nAngles);
 
   debug_print("%s| Initializing jacobian interpolation\n", getTime());
-  gsl_spline_init(jacSpline, jacAngles, jac, *nJac);
+  gsl_spline_init(jacSpline, angles, jac, *nAngles);
   debug_print("%s| Initializing gap interpolation\n", getTime());
-  gsl_spline_init(gapSpline, gapAngles, gap, *nGap);
+  gsl_spline_init(gapSpline, angles, gap, *nAngles);
 
   struct gap_params params;
   params.jacSpline = jacSpline;
@@ -515,7 +516,7 @@ extern "C" void sd_A(double* d, int *nd, double* Gamma, double* c, double* phi0,
     for(n = 0; n < MAXIT; n++){
       debug_print("%s| Calculating Matsubara frequency (n=%d+0.5)\n", getTime(), n);
       params.omega_t = (n+0.5);
-      params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma, *c, *phi0, *phi1, &params, w);
+      params.omega_t = omega_tilde(params.omega_t, d[j], *Gamma/(2*M_PI*(*t)), *c, *phi0, *phi1, &params, w);
       params.n = n;
       params.d = d[j];
       gsl_integration_qag(&F, *phi0, *phi1, 0, INTTOL, 1000, 2, w, &res, &error);
